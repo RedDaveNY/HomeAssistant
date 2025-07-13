@@ -1,0 +1,52 @@
+alias: PV-Drosselung dynamisch anpassen
+description: Erhöhe oder senke den Wechselrichter-Limit-Wert basierend auf Netzleistung
+triggers:
+  - entity_id:
+      - sensor.electricity_bmgw_1_gesamtleistung
+      - sensor.opendtu_ac_power_2
+      - binary_sensor.hms1600_producing
+    trigger: state
+conditions:
+  - condition: numeric_state
+    entity_id: sensor.opendtu_ac_power_2
+    above: 50
+  - condition: or
+    conditions:
+      - condition: numeric_state
+        entity_id: sensor.electricity_bmgw_1_gesamtleistung
+        above: 4
+      - condition: numeric_state
+        entity_id: sensor.electricity_bmgw_1_gesamtleistung
+        below: -100
+  - condition: state
+    entity_id: binary_sensor.hms1600_producing
+    state: "on"
+actions:
+  - variables:
+      current_limit: "{{ states('number.hms1600_limit_nonpersistent_relative') | int }}"
+  - choose:
+      - conditions:
+          - condition: numeric_state
+            entity_id: sensor.electricity_bmgw_1_gesamtleistung
+            above: 4
+          - condition: template
+            value_template: "{{ current_limit < 100 }}"
+        sequence:
+          - target:
+              entity_id: number.hms1600_limit_nonpersistent_relative
+            data:
+              value: "{{ [current_limit + 10, 100] | min }}"
+            action: number.set_value
+      - conditions:
+          - condition: numeric_state
+            entity_id: sensor.electricity_bmgw_1_gesamtleistung
+            below: -200
+          - condition: template
+            value_template: "{{ current_limit > 20 }}"
+        sequence:
+          - target:
+              entity_id: number.hms1600_limit_nonpersistent_relative
+            data:
+              value: "{{ [current_limit - 10, 20] | max }}"
+            action: number.set_value
+mode: single
